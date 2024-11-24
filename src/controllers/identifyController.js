@@ -36,18 +36,53 @@ const identifyController = async (req, res) => {
       });
     }
 
-    let primaryContact = null;
+    if (phoneNumber && !email) {
+      const existingContact = contacts.find(contact => contact.phoneNumber === phoneNumber);
+      if (existingContact) {
+        const primaryContact = contacts.find(contact => contact.linkPrecedence === 'primary') || existingContact;
 
-    if (email && phoneNumber) {
-      primaryContact = contacts.find(contact => contact.email === email && contact.phoneNumber === phoneNumber);
+        const allContacts = await prisma.contact.findMany({
+          where: {
+            OR: [
+              { id: primaryContact.id },
+              { linkedId: primaryContact.id },
+            ],
+          },
+        });
+
+        const emails = Array.from(new Set(allContacts.map(contact => contact.email).filter(Boolean)));
+        const phoneNumbers = Array.from(new Set(allContacts.map(contact => contact.phoneNumber).filter(Boolean)));
+        const secondaryContactIds = allContacts
+          .filter(contact => contact.id !== primaryContact.id)
+          .map(contact => contact.id);
+
+        return res.status(200).json({
+          contact: {
+            primaryContactId: primaryContact.id,
+            emails,
+            phoneNumbers,
+            secondaryContactIds,
+          },
+        });
+      }
     }
 
-    if (!primaryContact && email && !phoneNumber) {
-      primaryContact = contacts.find(contact => contact.email === email && contact.linkPrecedence === 'primary');
-    }
+    let primaryContact = contacts.find(contact => contact.linkPrecedence === 'primary') || contacts[0];
 
-    if (!primaryContact) {
-      primaryContact = contacts.find(contact => contact.linkPrecedence === 'primary') || contacts[0];
+    const phoneNumberExists = contacts.some(contact => contact.phoneNumber === phoneNumber);
+    const emailExists = contacts.some(contact => contact.email === email);
+
+    if (phoneNumberExists && !emailExists) {
+      const newSecondaryContact = await prisma.contact.create({
+        data: {
+          email,
+          phoneNumber,
+          linkPrecedence: 'secondary',
+          linkedId: primaryContact.id,
+        },
+      });
+
+      contacts.push(newSecondaryContact);
     }
 
     for (const contact of contacts) {
@@ -72,9 +107,7 @@ const identifyController = async (req, res) => {
     });
 
     const emails = Array.from(new Set(allContacts.map(contact => contact.email).filter(Boolean)));
-    const phoneNumbers = Array.from(
-      new Set(allContacts.map(contact => contact.phoneNumber).filter(Boolean))
-    );
+    const phoneNumbers = Array.from(new Set(allContacts.map(contact => contact.phoneNumber).filter(Boolean)));
     const secondaryContactIds = allContacts
       .filter(contact => contact.id !== primaryContact.id)
       .map(contact => contact.id);
