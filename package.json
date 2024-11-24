@@ -1,16 +1,13 @@
 {
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "body-parser": "^1.20.3",
     "express": "^4.21.1"
   },
   "scripts": {
-    "start": "npx prisma migrate deploy && node server.ts"
+    "start": "npx prisma migrate deploy && node src/server.js"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.9.3",
-    "prisma": "^5.22.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "prisma": "^5.22.0"
   }
 }
